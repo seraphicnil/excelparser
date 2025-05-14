@@ -54,8 +54,15 @@ func parseSheet(f *excelize.File, sheetName string) {
 	}
 	row0 := rows[0]
 	row1 := rows[1]
+	row2 := rows[2]
 
+	invalidIdxMap := make(map[int]bool)
 	for idx, field := range row0 {
+		exportType := row2[idx]
+		if exportType == "c" || exportType == "C" {
+			invalidIdxMap[idx] = true
+			continue
+		}
 		fieldType := row1[idx]
 		fields = append(fields, reflect.StructField{Name: field, Type: getType(fieldType)})
 	}
@@ -72,15 +79,20 @@ func parseSheet(f *excelize.File, sheetName string) {
 	}
 	os.Create(exportFileName)
 	for rowIndex, row := range rows {
-		if rowIndex > 2 {
+		if rowIndex > 3 {
 			// 创建该类型的实例
 			instance := reflect.New(structType).Elem()
+			idx := -1
 			for colIndex, cellValue := range row {
+				if _, ok := invalidIdxMap[colIndex]; ok {
+					continue
+				}
+				idx++
 				fieldType := row1[colIndex]
 				switch fieldType {
 				case "uint32":
 					if len(cellValue) == 0 {
-						instance.Field(colIndex).SetUint(0)
+						instance.Field(idx).SetUint(0)
 						continue
 					}
 					num64, err := strconv.ParseInt(cellValue, 10, 64) // 参数：字符串, 进制(10), 位数(64)
@@ -89,10 +101,10 @@ func parseSheet(f *excelize.File, sheetName string) {
 					} else {
 						//fmt.Printf("转换结果: %d, 类型: %T\n", num64, num64) // 输出: -456, int64
 					}
-					instance.Field(colIndex).SetUint(uint64(num64))
+					instance.Field(idx).SetUint(uint64(num64))
 				case "uint64":
 					if len(cellValue) == 0 {
-						instance.Field(colIndex).SetUint(uint64(0))
+						instance.Field(idx).SetUint(uint64(0))
 						continue
 					}
 					num64, err := strconv.ParseInt(cellValue, 10, 64) // 参数：字符串, 进制(10), 位数(64)
@@ -101,10 +113,10 @@ func parseSheet(f *excelize.File, sheetName string) {
 					} else {
 						//fmt.Printf("转换结果: %d, 类型: %T\n", num64, num64) // 输出: -456, int64
 					}
-					instance.Field(colIndex).SetUint(uint64(num64))
+					instance.Field(idx).SetUint(uint64(num64))
 				case "int32":
 					if len(cellValue) == 0 {
-						instance.Field(colIndex).SetInt(0)
+						instance.Field(idx).SetInt(0)
 						continue
 					}
 					num64, err := strconv.ParseInt(cellValue, 10, 64) // 参数：字符串, 进制(10), 位数(64)
@@ -113,10 +125,10 @@ func parseSheet(f *excelize.File, sheetName string) {
 					} else {
 						//fmt.Printf("转换结果: %d, 类型: %T\n", num64, num64) // 输出: -456, int64
 					}
-					instance.Field(colIndex).SetInt(num64)
+					instance.Field(idx).SetInt(num64)
 				case "int64":
 					if len(cellValue) == 0 {
-						instance.Field(colIndex).SetInt((0))
+						instance.Field(idx).SetInt((0))
 						continue
 					}
 					num64, err := strconv.ParseInt(cellValue, 10, 64) // 参数：字符串, 进制(10), 位数(64)
@@ -125,20 +137,20 @@ func parseSheet(f *excelize.File, sheetName string) {
 					} else {
 						//fmt.Printf("转换结果: %d, 类型: %T\n", num64, num64) // 输出: -456, int64
 					}
-					instance.Field(colIndex).SetInt(num64)
+					instance.Field(idx).SetInt(num64)
 				case "string":
-					instance.Field(colIndex).SetString(cellValue)
+					instance.Field(idx).SetString(cellValue)
 				case "float":
 					f64, err := strconv.ParseFloat(cellValue, 64) // 参数：字符串, 进制(10), 位数(64)
 					if err != nil {
 						fmt.Println(err)
 					}
-					instance.Field(colIndex).SetFloat(f64)
+					instance.Field(idx).SetFloat(f64)
 				case "bool":
 					if len(cellValue) == 0 {
-						instance.Field(colIndex).SetBool(false)
+						instance.Field(idx).SetBool(false)
 					} else {
-						instance.Field(colIndex).SetBool(true)
+						instance.Field(idx).SetBool(true)
 					}
 				}
 			}
