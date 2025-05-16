@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/xuri/excelize/v2"
 	"log"
@@ -14,16 +15,17 @@ import (
 var (
 	SourceDir string
 	ExportDir string
+	Interrupt bool
 )
 
-func ParseOnFile(fileName string) {
+func ParseOnFile(fileName string) error {
 	if strings.Contains(fileName, ".xlsx") == false {
-		return
+		return errors.New("invalid excel file")
 	}
 	f, err := excelize.OpenFile(fileName)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return err
 	}
 	defer f.Close() // 确保关闭文件句柄^[3]
 	fmt.Printf("excel:  %s\n", fileName)
@@ -36,13 +38,20 @@ func ParseOnFile(fileName string) {
 		if len(nameArr) == 2 {
 			if nameArr[0] == "export" {
 				excelSheetName = nameArr[1]
-				parseSheet(f, excelSheetName)
+				err = parseSheet(f, excelSheetName)
+				if err != nil {
+					if Interrupt {
+						return err
+					}
+					continue
+				}
 			}
 		}
 	}
+	return nil
 }
 
-func parseSheet(f *excelize.File, sheetName string) {
+func parseSheet(f *excelize.File, sheetName string) error {
 	// 定义字段名和类型
 	fields := make([]reflect.StructField, 0)
 
@@ -50,7 +59,7 @@ func parseSheet(f *excelize.File, sheetName string) {
 	rows, err := f.GetRows(excelSheetName)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return err
 	}
 	row0 := rows[0]
 	row1 := rows[1]
@@ -72,12 +81,17 @@ func parseSheet(f *excelize.File, sheetName string) {
 
 	exportFileName := sheetName + ".export"
 	if len(ExportDir) > 0 {
-		if _, err := os.Stat(exportFileName); os.IsNotExist(err) {
+		os.RemoveAll(ExportDir)
+		if _, err := os.Stat(ExportDir); os.IsNotExist(err) {
 			os.MkdirAll(ExportDir, os.ModePerm)
 		}
 		exportFileName = ExportDir + "/" + exportFileName
 	}
-	os.Create(exportFileName)
+	_, err = os.Create(exportFileName)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 	for rowIndex, row := range rows {
 		if rowIndex > 3 {
 			// 创建该类型的实例
@@ -160,11 +174,13 @@ func parseSheet(f *excelize.File, sheetName string) {
 			val, err := json.Marshal(instance.Interface())
 			if err != nil {
 				fmt.Println(err)
+				return err
 			}
 			writeFile(exportFileName, val)
 			writeFile(exportFileName, []byte("\n"))
 		}
 	}
+	return nil
 }
 
 func getType(val string) reflect.Type {

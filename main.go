@@ -21,9 +21,17 @@ func main() {
 	err := filepath.WalkDir(SourceDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			fmt.Printf("访问路径出错 %q: %v\n", path, err)
+			if Interrupt {
+				return err
+			}
 			return nil // 忽略错误，继续遍历
 		}
-		ParseOnFile(path)
+		err = ParseOnFile(path)
+		if err != nil {
+			if Interrupt {
+				return err
+			}
+		}
 		return nil
 	})
 
